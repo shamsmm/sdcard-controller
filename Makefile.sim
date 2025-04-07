@@ -1,4 +1,4 @@
-NAME=spi_controller_tb
+NAME=sd_spi_tb
 
 visualize: run
 	gtkwave test.fst

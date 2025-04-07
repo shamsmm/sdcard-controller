@@ -2,19 +2,19 @@
 module spi_controller #(
     parameter int MEMORY_SIZE_IN_BYTES = 64
 ) (
-    output logic mosi,
-    input logic miso,
-    output logic sclk,
-    input logic clk,
-    input logic rst_n,
-    input logic [7:0] data_in,
-    output logic [7:0] data_out,
-    output logic wr,
-    input logic op,
-    input logic start,
-    output logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] address,
-    input logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] size,
-    output logic done
+    output  logic mosi,
+    input   logic miso,
+    output  logic sclk,
+    input   logic clk,
+    input   logic rst_n,
+    input   logic [7:0] data_in,
+    output  logic [7:0] data_out,
+    output  logic wr,
+    input   logic op,
+    input   logic start,
+    output  logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] address,
+    input   logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] size,
+    output  logic done
 );
 
 // FSM States
@@ -67,7 +67,7 @@ always_ff @(negedge clk or negedge rst_n) begin
         mosi <= 1'b0;
     else if (cs == WRITE)
         mosi <= data_in[bit_counter];
-    else if (cs == READ)
+    else if (cs == READ | (cs == IDLE && op == OP_READ && start))
         mosi <= 1'b1;
     else
         mosi <= 1'b0;
