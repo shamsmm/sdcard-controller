@@ -1,5 +1,3 @@
-/* verilator lint_off TIMESCALEMOD */
-
 // CPOL = 0, CPHA = 0
 module spi_controller #(
     parameter int MEMORY_SIZE_IN_BYTES = 64
@@ -36,11 +34,10 @@ logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] byte_counter, next_byte_counter;
 logic [2:0] bit_counter, next_bit_counter;
 
 logic [7:0] shift_reg, next_shift_reg;
-logic next_mosi;
 logic next_sclk_en, sclk_en;
+logic next_done, next_wr;
 
 assign sclk = clk & sclk_en;
-assign mosi = next_mosi;
 assign address = byte_counter;
 assign data_out = shift_reg;
 
@@ -51,25 +48,29 @@ always_ff @(posedge clk or negedge rst_n) begin
         byte_counter <= 0;
         bit_counter  <= 3'd7;
         shift_reg    <= 8'b0;
+        done    <= 1'b0;
+        wr    <= 1'b0;
     end else begin
         cs           <= ns;
         byte_counter <= next_byte_counter;
         bit_counter  <= next_bit_counter;
         shift_reg    <= next_shift_reg;
-        sclk_en         <= next_sclk_en;
+        sclk_en      <= next_sclk_en;
+        wr           <= next_wr;
+        done         <= next_done;
     end
 end
 
 // mosi update (on negedge for SPI standard timing)
 always_ff @(negedge clk or negedge rst_n) begin
     if (!rst_n)
-        next_mosi <= 1'b0;
+        mosi <= 1'b0;
     else if (cs == WRITE)
-        next_mosi <= data_in[bit_counter];
+        mosi <= data_in[bit_counter];
     else if (cs == READ)
-        next_mosi <= 1'b1;
+        mosi <= 1'b1;
     else
-        next_mosi <= 1'b0;
+        mosi <= 1'b0;
 end
 
 // FSM Combinational logic
@@ -79,8 +80,8 @@ always_comb begin
     next_byte_counter = byte_counter;
     next_bit_counter  = bit_counter;
     next_shift_reg    = shift_reg;
-    wr                = 1'b0;
-    done              = 1'b0;
+    next_wr           = 1'b0;
+    next_done         = 1'b0;
 
     case (cs)
         IDLE: begin
@@ -89,10 +90,11 @@ always_comb begin
             if (start) begin
                 next_byte_counter = 0;
                 next_bit_counter  = 3'd7;
-                next_shift_reg    = 8'b0;
 
                 ns = (op == OP_READ) ? READ :
                      (op == OP_WRITE) ? WRITE : IDLE;
+
+                if (op == OP_READ) next_sclk_en = 1'b1;
             end
         end
 
@@ -101,13 +103,15 @@ always_comb begin
             next_shift_reg = {shift_reg[6:0], miso};
 
             if (bit_counter == 0) begin
-                wr = 1'b1;
+                next_wr = 1'b1;
                 next_bit_counter = 3'd7;
-                next_byte_counter = byte_counter + 1;
 
                 if (byte_counter == size) begin
                     ns = IDLE;
-                    done = 1'b1;
+                    next_done = 1'b1;
+                    next_sclk_en = 1'b0;
+                end else begin
+                    next_byte_counter = byte_counter + 1;
                 end
             end else begin
                 next_bit_counter = bit_counter - 1;
@@ -123,7 +127,7 @@ always_comb begin
 
                 if (byte_counter == size) begin
                     ns = IDLE;
-                    done = 1'b1;
+                    next_done = 1'b1;
                 end
             end else begin
                 next_bit_counter = bit_counter - 1;

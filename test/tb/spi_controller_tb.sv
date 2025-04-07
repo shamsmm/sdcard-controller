@@ -17,10 +17,10 @@ module spi_controller_tb;
     logic done;
 
     // Memories
-    logic [7:0] mem_ro [MEM_SIZE] = '{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    logic [7:0] mem_ro [MEM_SIZE] = '{'hAA, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     logic [7:0] mem_wo [MEM_SIZE];
 
-    always_ff @(posedge sclk) begin
+    always_ff @(posedge clk) begin
         if (wr)
             mem_wo[address] <= data_out;
     end
@@ -50,16 +50,6 @@ module spi_controller_tb;
     always #(CLK_PERIOD / 2) clk = ~clk;
 
 
-    // Example MISO toggling bits
-    logic t = 0;
-
-    always_ff @(negedge sclk) begin
-        if (op == 1'b0) begin
-            miso <= t;
-            t <= ~t;
-        end
-    end
-
     // Test sequence
     initial begin
         $dumpfile("test.fst");
@@ -78,6 +68,12 @@ module spi_controller_tb;
         op = 1;
         // Data in memory is present
         start = 1;
+
+//        size = 0;
+//        op = 0;
+//        start = 1;
+//
+//        miso = 1;
 
         @(posedge clk);
         #(CLK_PERIOD);
