@@ -49,6 +49,7 @@ always_ff @(posedge clk or negedge rst_n) begin
         shift_reg    <= 8'b0;
         done    <= 1'b0;
         wr    <= 1'b0;
+        sclk_en <= 1'b0;
     end else begin
         cs           <= ns;
         byte_counter <= next_byte_counter;
