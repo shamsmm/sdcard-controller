@@ -50,6 +50,17 @@ module spi_controller_tb;
     always #(CLK_PERIOD / 2) clk = ~clk;
 
 
+    // Simple SPI slave model to echo back data (for test purposes)
+    logic [23:0] slave_data;  // preload data for read
+
+    always_ff @(negedge sclk) begin
+        if (op == 1'b0) begin
+            // read: send bits from slave_data
+            miso <= slave_data[23];
+            slave_data <= slave_data << 1;
+        end
+    end
+
     // Test sequence
     initial begin
         $dumpfile("test.fst");
@@ -64,14 +75,15 @@ module spi_controller_tb;
         #10
         rst_n = 1;
 
-        size = 3;
-        op = 1;
-        // Data in memory is present
-        start = 1;
-
-//        size = 0;
-//        op = 0;
+//        size = 3;
+//        op = 1;
+//        // Data in memory is present
 //        start = 1;
+
+        slave_data = 24'b111100001100101000110000;
+        size = 2;
+        op = 0;
+        start = 1;
 //
 //        miso = 1;
 

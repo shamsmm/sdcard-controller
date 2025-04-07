@@ -38,7 +38,6 @@ logic next_sclk_en, sclk_en;
 logic next_done, next_wr;
 
 assign sclk = clk & sclk_en;
-assign address = byte_counter;
 assign data_out = shift_reg;
 
 // FSM Sequential logic
@@ -105,6 +104,7 @@ always_comb begin
             if (bit_counter == 0) begin
                 next_wr = 1'b1;
                 next_bit_counter = 3'd7;
+                address = byte_counter;
 
                 if (byte_counter == size) begin
                     ns = IDLE;
@@ -119,6 +119,7 @@ always_comb begin
         end
 
         WRITE: begin
+            address = byte_counter;
             next_sclk_en = 1'b1;
 
             if (bit_counter == 0) begin
