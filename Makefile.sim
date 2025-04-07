@@ -1,0 +1,14 @@
+NAME=spi_controller_tb
+
+visualize: run
+	gtkwave test.fst
+
+run: compile
+	./obj_dir/V$(NAME)
+
+compile:
+	verilator --binary -j 0 test/tb/$(NAME).sv -y src --trace-fst
+
+clean:
+	rm -rf obj_dir
+	rm -f test.fst
