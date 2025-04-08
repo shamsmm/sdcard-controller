@@ -1,5 +1,5 @@
 #NAME=spi_controller_tb
-NAME=sd_spi_tb
+NAME=sd_spi_tb_2
 
 visualize: run
 	gtkwave test.fst
