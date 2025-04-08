@@ -26,12 +26,10 @@ logic [7:0] command_buffer [6];
 // FSM States
 typedef enum logic [2:0] {
     IDLE  = 3'd0,
-    SPIWRITE = 3'd1,
-    SPISTART = 3'd2,
-    WAIT = 3'd3,
-    WRITEDONE = 3'd4,
-    SPIREAD = 3'd5,
-    READDONE = 3'd6
+    SPISTART = 3'd1,
+    WAITWRITE = 3'd2,
+    SPIREAD = 3'd3,
+    WAITREAD = 3'd4
 } state_t;
 
 state_t cs, ns, rs, next_rs;
@@ -86,45 +84,40 @@ always_comb begin
             next_spi_ss = 1;
 
             if (start) begin
-                ns = SPIWRITE;
+                next_spi_size = 5; // 0 corresponds to minimal a 1-byte transfer
+                next_spi_op = 1;
+                next_spi_ss = 0;
+                ns = SPISTART;
+                next_rs = WAITWRITE;
             end
-        end
-
-        SPIWRITE: begin
-            next_spi_size = {CMD_SIZE - 1}[$clog2(MEMORY_SIZE_IN_BYTES)-1:0]; // 0 corresponds to minimal a 1-byte transfer
-            next_spi_op = 1;
-            next_spi_ss = 0;
-            ns = SPISTART;
-            next_rs = WRITEDONE;
         end
 
         SPISTART: begin
             next_spi_start = 1'b1;
-            ns = WAIT;
+            ns = rs;
         end
 
-        WAIT: begin
+        WAITWRITE: begin
             next_spi_start = 0;
             if (spi_done) begin
-                ns = rs;
+                ns = SPIREAD;
+                next_response = spi_data_out;
             end
-        end
-
-        WRITEDONE: begin
-            next_response = spi_data_out;
-            ns = SPIREAD;
         end
 
         SPIREAD: begin
             next_spi_size = nresponse;
             next_spi_op = 0;
             ns = SPISTART;
-            next_rs = READDONE;
+            next_rs = WAITREAD;
         end
 
-        READDONE: begin
-            next_done = 1'b1;
-            ns = IDLE;
+        WAITREAD: begin
+            next_spi_start = 0;
+            if (spi_done) begin
+                ns = IDLE;
+                next_done = 1'b1;
+            end
         end
 
         default: ns = IDLE;

@@ -62,12 +62,15 @@ module spi_controller_tb;
 
     // Simple SPI slave model to echo back data (for test purposes)
     logic [23:0] slave_data;  // preload data for read
+    int ptr = 24;
+
+    always_comb begin
+        miso = slave_data[ptr];
+    end
 
     always_ff @(negedge sclk) begin
-        if (op == 1'b0) begin
-            // read: send bits from slave_data
-            miso <= slave_data[23];
-            slave_data <= slave_data << 1;
+        if (dut.cs == 2'd2) begin
+            ptr <= ptr - 1;
         end
     end
 
@@ -80,7 +83,7 @@ module spi_controller_tb;
         rst_n = 0;
         start = 0;
         op = 0;
-        miso = 1'b0;
+        slave_data = 24'b111100001100101000110000;
 
         #10
         rst_n = 1;
@@ -98,7 +101,6 @@ module spi_controller_tb;
 
         // Read Test
         state = READ;
-        slave_data = 24'b111100001100101000110000;
 
         size = 2;
         op = 0;

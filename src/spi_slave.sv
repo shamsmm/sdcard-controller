@@ -108,7 +108,8 @@ always_comb begin
         IDLE: begin
             if (sclk) begin
                 next_byte_counter = 0;
-                next_bit_counter  = 3'd7;
+                next_shift_reg = {shift_reg[6:0], mosi_registered};
+                next_bit_counter  = 3'd6;
                 ns = COMMAND;
             end
         end
