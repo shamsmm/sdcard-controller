@@ -84,10 +84,8 @@ end
 always_ff @(negedge sclk or negedge rst_n) begin
     if (!rst_n)
         miso <= 1'b0;
-    else if (cs == WRITE)
+    else if (cs == WRITE | (cs == WAIT && op == OP_WRITE && start))
         miso <= data_in[bit_counter];
-    else if (cs == READ | (cs == IDLE && op == OP_READ))
-        miso <= 1'b1;
     else
         miso <= 1'b0;
 end
