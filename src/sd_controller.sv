@@ -19,6 +19,8 @@ module sd_controller #(
     input rst_n
 );
 
+localparam int CMD_SIZE = 6;
+
 logic [7:0] command_buffer [6];
 
 // FSM States
@@ -30,7 +32,7 @@ typedef enum logic [2:0] {
     WAITREAD = 3'd4
 } state_t;
 
-state_t cs, ns;
+state_t cs, ns, rs, next_rs;
 
 logic next_spi_op, next_spi_start, next_spi_ss, next_done;
 logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] next_spi_size;
@@ -42,6 +44,7 @@ assign spi_data_in = command_buffer[spi_address];
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         cs           <= IDLE;
+        rs          <= IDLE;
         spi_size    <= 0;
         spi_op <= 0;
         spi_start <= 0;
@@ -49,6 +52,7 @@ always_ff @(posedge clk or negedge rst_n) begin
         done <= 0;
     end else begin
         cs           <= ns;
+        rs           <= next_rs;
         spi_size    <= next_spi_size;
         spi_op <= next_spi_op;
         spi_start <= next_spi_start;
@@ -60,6 +64,7 @@ end
 
 always_comb begin
     ns = cs;
+    next_rs = rs;
     next_spi_size = spi_size;
     next_spi_op = spi_op;
     next_spi_start = spi_start;
@@ -79,16 +84,17 @@ always_comb begin
             next_spi_ss = 1;
 
             if (start) begin
-                next_spi_size = 5; // 5 + 1 = 6 bytes = 48 bit
+                next_spi_size = CMD_SIZE - 1; // 0 corresponds to minimal a 1-byte transfer
                 next_spi_op = 1;
                 next_spi_ss = 0;
                 ns = SPISTART;
+                next_rs = WAITWRITE;
             end
         end
 
         SPISTART: begin
             next_spi_start = 1'b1;
-            ns = WAITWRITE;
+            ns = rs;
         end
 
         WAITWRITE: begin
@@ -102,8 +108,8 @@ always_comb begin
         SPIREAD: begin
             next_spi_size = nresponse;
             next_spi_op = 0;
-            next_spi_start = 1'b1;
-            ns = WAITREAD;
+            ns = SPISTART;
+            next_rs = WAITREAD;
         end
 
         WAITREAD: begin
