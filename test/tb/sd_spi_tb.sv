@@ -64,7 +64,6 @@ module sd_spi_tb;
     assign op     = spi_op;
     assign start  = spi_start;
     assign size   = spi_size;
-    assign address = spi_address;
     assign spi_data_out = data_out;
     assign spi_done = done;
     assign data_in = spi_data_in;
@@ -76,7 +75,7 @@ module sd_spi_tb;
         .spi_size(spi_size),
         .spi_op(spi_op),
         .spi_data_in(spi_data_in),
-        .spi_address(spi_address),
+        .spi_address(address),
         .spi_data_out(spi_data_out),
         .spi_start(spi_start),
         .spi_ss(spi_ss),
@@ -96,8 +95,8 @@ module sd_spi_tb;
     // Simple SPI slave model to echo back data (for test purposes)
     logic [23:0] slave_data;
 
-    always_ff @(negedge sclk) begin
-        if (spi_op == 1'b0) begin  // read
+    always_ff @(negedge clk) begin
+        if (spi_op == 1'b0 && sd_inst.cs == 4) begin  // read
             miso <= slave_data[23];
             slave_data <= slave_data << 1;
         end
