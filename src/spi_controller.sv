@@ -33,9 +33,10 @@ localparam bit OP_WRITE = 1'b1;
 logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] byte_counter, next_byte_counter;
 logic [2:0] bit_counter, next_bit_counter;
 
-logic [7:0] shift_reg, next_shift_reg;
+logic [7:0] shift_reg;
 logic next_sclk_en, sclk_en;
 logic next_done, next_wr;
+logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] next_address;
 
 assign sclk = clk & sclk_en;
 assign data_out = shift_reg;
@@ -50,14 +51,26 @@ always_ff @(posedge clk or negedge rst_n) begin
         done    <= 1'b0;
         wr    <= 1'b0;
         sclk_en <= 1'b0;
+        address <= 0;
     end else begin
         cs           <= ns;
         byte_counter <= next_byte_counter;
         bit_counter  <= next_bit_counter;
-        shift_reg    <= next_shift_reg;
         sclk_en      <= next_sclk_en;
         wr           <= next_wr;
         done         <= next_done;
+        address <= next_address;
+    end
+end
+
+always_ff @(posedge clk or negedge rst_n) begin
+if (!rst_n) begin
+        shift_reg    <= 8'b0;
+    end else begin
+        if (cs == READ)
+            shift_reg    <= {shift_reg[6:0], miso};
+        else
+            shift_reg <= shift_reg;
     end
 end
 
@@ -67,7 +80,7 @@ always_ff @(negedge clk or negedge rst_n) begin
         mosi <= 1'b0;
     else if (cs == WRITE)
         mosi <= data_in[bit_counter];
-    else if (cs == READ | (cs == IDLE && op == OP_READ && start))
+    else if (cs == READ | (cs == IDLE && op == OP_READ))
         mosi <= 1'b1;
     else
         mosi <= 1'b0;
@@ -79,8 +92,8 @@ always_comb begin
     next_sclk_en      = sclk_en;
     next_byte_counter = byte_counter;
     next_bit_counter  = bit_counter;
-    next_shift_reg    = shift_reg;
     next_wr           = 1'b0;
+    next_address      = address;
     next_done         = 1'b0;
 
     case (cs)
@@ -91,37 +104,36 @@ always_comb begin
                 next_byte_counter = 0;
                 next_bit_counter  = 3'd7;
 
-                ns = (op == OP_READ) ? READ :
-                     (op == OP_WRITE) ? WRITE : IDLE;
-
-                if (op == OP_READ) next_sclk_en = 1'b1;
+                if (op == OP_READ) begin
+                    ns = READ;
+                    next_sclk_en = 1'b1;
+                end else begin
+                    ns = WRITE;
+                    next_address = 0;
+                end
             end
         end
 
         READ: begin
-            // Sample miso bit
-            next_shift_reg = {shift_reg[6:0], miso};
-
             if (bit_counter == 0) begin
                 next_wr = 1'b1;
                 next_bit_counter = 3'd7;
-                address = byte_counter;
+                next_byte_counter = byte_counter + 1;
 
                 if (byte_counter == size) begin
                     ns = IDLE;
                     next_done = 1'b1;
                     next_sclk_en = 1'b0;
-                end else begin
-                    next_byte_counter = byte_counter + 1;
                 end
             end else begin
+                next_address = byte_counter; // for writing in memory
                 next_bit_counter = bit_counter - 1;
             end
         end
 
         WRITE: begin
-            address = byte_counter;
             next_sclk_en = 1'b1;
+            next_address = next_byte_counter; // for reading memory
 
             if (bit_counter == 0) begin
                 next_bit_counter = 3'd7;

@@ -1,8 +1,17 @@
 module spi_controller_tb;
 
+    // TB states
+    typedef enum logic [1:0] {
+        WRITE = 2'd1,
+        READ  = 2'd2
+    } state_t;
+
+    state_t state;
+
     // Parameters
     localparam int MEM_SIZE = 10;
-    localparam int CLK_PERIOD = 2;
+
+    // Expected
 
     // DUT signals
     logic mosi, miso, sclk;
@@ -15,6 +24,7 @@ module spi_controller_tb;
     logic [$clog2(MEM_SIZE)-1:0] address;
     logic [$clog2(MEM_SIZE)-1:0] size;
     logic done;
+    logic mosi_exp;
 
     // Memories
     logic [7:0] mem_ro [MEM_SIZE] = '{'hAA, 1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -47,7 +57,7 @@ module spi_controller_tb;
     );
 
     // Clock generation
-    always #(CLK_PERIOD / 2) clk = ~clk;
+    always #1 clk = ~clk;
 
 
     // Simple SPI slave model to echo back data (for test purposes)
@@ -75,23 +85,29 @@ module spi_controller_tb;
         #10
         rst_n = 1;
 
-//        size = 3;
-//        op = 1;
-//        // Data in memory is present
-//        start = 1;
+        // Write Test
+        state = WRITE;
 
+        size = 9;
+        op = 1;
+
+        #2 start = 1;
+        #2 start = 0;
+
+        wait(done);
+
+        // Read Test
+        state = READ;
         slave_data = 24'b111100001100101000110000;
+
         size = 2;
         op = 0;
-        start = 1;
-//
-//        miso = 1;
 
-        @(posedge clk);
-        #(CLK_PERIOD);
-        start = 0;
+        #2 start = 1;
+        #2 start = 0;
 
-        #100;
+        #1000;
+
         $finish;
     end
 
