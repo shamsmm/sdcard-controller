@@ -84,7 +84,7 @@ module sd_spi_tb_2;
         .cmd(6'h0),
         .arg(32'h0),
         .crc(7'h4A),
-        .nresponse(2),
+        .nresponse(0),
         .start(sd_start),
         .clk(clk),
         .rst_n(rst_n)

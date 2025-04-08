@@ -48,10 +48,11 @@ logic [7:0] command_buffer [6];
 logic [7:0] response_buffer;
 
 always_comb begin
-    start = transfer;
+    command_buffer = cmd;
+    start = 1;
     size = 0;
     op = 1;
-    data_in = {cmd[5], cmd[4], cmd[3], cmd[2], cmd[1], cmd[0]} == 'h400000000095 ? 8'h01 : 8'hFF;
+    data_in = {cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]} == 'h400000000095 ? 8'h01 : 8'hFF;
 end
 
 endmodule

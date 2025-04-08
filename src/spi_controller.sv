@@ -97,7 +97,10 @@ always_comb begin
     next_done         = 1'b0;
     next_shift_reg = shift_reg;
 
-    address = byte_counter;
+    if (wr)
+        address = byte_counter - 1; // writing for previous byte
+    else
+        address  = byte_counter;
 
     case (cs)
         IDLE: begin
@@ -117,7 +120,6 @@ always_comb begin
 
         READ: begin
             next_sclk_en = 1'b1;
-            address = byte_counter - 1; // because write occurs after byte read
 
             if (sclk_en) begin
                 next_shift_reg = {shift_reg[6:0], miso_registered};

@@ -99,7 +99,10 @@ always_comb begin
     next_shift_reg = shift_reg;
     next_cmd = cmd;
 
-    address = byte_counter;
+    if (wr)
+            address = byte_counter - 1; // writing for previous byte
+        else
+            address  = byte_counter;
 
     case (cs)
         IDLE: begin
@@ -140,6 +143,7 @@ always_comb begin
                 if (op == OP_READ) begin
                     ns = READ;
                 end else begin
+                    next_bit_counter  = 3'd6; // already shifting now
                     ns = WRITE;
                 end
             end
