@@ -42,7 +42,6 @@ logic [7:0] next_cmd [COMMAND_SIZE];
 
 logic [7:0] shift_reg, next_shift_reg;
 logic next_done, next_transfer, next_wr;
-logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] next_address;
 
 logic mosi_registered;
 assign data_out = shift_reg;
@@ -56,7 +55,6 @@ always_ff @(posedge clk or negedge rst_n) begin
         shift_reg    <= 8'b0;
         done    <= 1'b0;
         wr    <= 1'b0;
-        address <= 0;
         cmd <= {0, 0, 0, 0, 0, 0};
         transfer <= 0;
     end else begin
@@ -65,7 +63,6 @@ always_ff @(posedge clk or negedge rst_n) begin
         bit_counter  <= next_bit_counter;
         wr           <= next_wr;
         done         <= next_done;
-        address <= next_address;
         shift_reg <= next_shift_reg;
         cmd <= next_cmd;
         transfer <= next_transfer;
@@ -93,40 +90,45 @@ end
 // FSM Combinational logic
 always_comb begin
     ns                = cs;
+
     next_byte_counter = byte_counter;
     next_bit_counter  = bit_counter;
     next_wr           = 1'b0;
-    next_address      = address;
     next_done         = 1'b0;
     next_transfer = 1'b0;
     next_shift_reg = shift_reg;
     next_cmd = cmd;
 
+    address = byte_counter;
+
     case (cs)
         IDLE: begin
             if (sclk) begin
                 next_byte_counter = 0;
+                next_bit_counter  = 3'd6; // first bit is sampled rightnow
+
                 next_shift_reg = {shift_reg[6:0], mosi_registered};
-                next_bit_counter  = 3'd6;
                 ns = COMMAND;
             end
         end
 
         COMMAND: begin
-            next_shift_reg = {shift_reg[6:0], mosi_registered};
+            if (sclk) begin
+                next_shift_reg = {shift_reg[6:0], mosi_registered};
 
-            if (bit_counter == 0) begin
-                next_cmd[byte_counter[2:0]] = next_shift_reg;
+                if (bit_counter == 0) begin
+                    next_cmd[byte_counter[2:0]] = next_shift_reg;
 
-                next_bit_counter = 3'd7;
-                next_byte_counter = byte_counter + 1;
+                    next_bit_counter = 3'd7;
+                    next_byte_counter = byte_counter + 1;
 
-                if (byte_counter == {COMMAND_SIZE - 1}[$clog2(MEMORY_SIZE_IN_BYTES)-1:0]) begin
-                    ns = WAIT;
-                    next_transfer = 1'b1;
+                    if (byte_counter == {COMMAND_SIZE - 1}[$clog2(MEMORY_SIZE_IN_BYTES)-1:0]) begin
+                        ns = WAIT;
+                        next_transfer = 1'b1;
+                    end
+                end else begin
+                    next_bit_counter = bit_counter - 1;
                 end
-            end else begin
-                next_bit_counter = bit_counter - 1;
             end
         end
 
@@ -139,42 +141,43 @@ always_comb begin
                     ns = READ;
                 end else begin
                     ns = WRITE;
-                    next_address = 0;
                 end
             end
         end
 
         READ: begin
-            next_shift_reg = {shift_reg[6:0], mosi_registered};
+            if (sclk) begin
+                address = byte_counter - 1; // because write occurs after byte read
+                next_shift_reg = {shift_reg[6:0], mosi_registered};
 
-            if (bit_counter == 0) begin
-                next_wr = 1'b1;
-                next_bit_counter = 3'd7;
-                next_byte_counter = byte_counter + 1;
+                if (bit_counter == 0) begin
+                    next_wr = 1'b1;
+                    next_bit_counter = 3'd7;
+                    next_byte_counter = byte_counter + 1;
 
-                if (byte_counter == size) begin
-                    ns = IDLE;
-                    next_done = 1'b1;
+                    if (byte_counter == size) begin
+                        ns = IDLE;
+                        next_done = 1'b1;
+                    end
+                end else begin
+                    next_bit_counter = bit_counter - 1;
                 end
-            end else begin
-                next_address = byte_counter; // for writing in memory
-                next_bit_counter = bit_counter - 1;
             end
         end
 
         WRITE: begin
-            next_address = next_byte_counter; // for reading memory
+            if (sclk) begin
+                if (bit_counter == 0) begin
+                    next_bit_counter = 3'd7;
+                    next_byte_counter = byte_counter + 1;
 
-            if (bit_counter == 0) begin
-                next_bit_counter = 3'd7;
-                next_byte_counter = byte_counter + 1;
-
-                if (byte_counter == size) begin
-                    ns = IDLE;
-                    next_done = 1'b1;
+                    if (byte_counter == size) begin
+                        ns = IDLE;
+                        next_done = 1'b1;
+                    end
+                end else begin
+                    next_bit_counter = bit_counter - 1;
                 end
-            end else begin
-                next_bit_counter = bit_counter - 1;
             end
         end
 
