@@ -33,10 +33,12 @@ localparam bit OP_WRITE = 1'b1;
 logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] byte_counter, next_byte_counter;
 logic [2:0] bit_counter, next_bit_counter;
 
-logic [7:0] shift_reg;
+logic [7:0] shift_reg, next_shift_reg;
 logic next_sclk_en, sclk_en;
 logic next_done, next_wr;
 logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] next_address;
+
+logic miso_registered;
 
 assign sclk = clk & sclk_en;
 assign data_out = shift_reg;
@@ -52,6 +54,7 @@ always_ff @(posedge clk or negedge rst_n) begin
         wr    <= 1'b0;
         sclk_en <= 1'b0;
         address <= 0;
+        shift_reg <= 0;
     end else begin
         cs           <= ns;
         byte_counter <= next_byte_counter;
@@ -60,17 +63,15 @@ always_ff @(posedge clk or negedge rst_n) begin
         wr           <= next_wr;
         done         <= next_done;
         address <= next_address;
+        shift_reg <= next_shift_reg;
     end
 end
 
 always_ff @(posedge clk or negedge rst_n) begin
-if (!rst_n) begin
-        shift_reg    <= 8'b0;
+    if (!rst_n) begin
+        miso_registered    <= 1'b0;
     end else begin
-        if (cs == READ)
-            shift_reg    <= {shift_reg[6:0], miso};
-        else
-            shift_reg <= shift_reg;
+        miso_registered    <= miso;
     end
 end
 
@@ -95,6 +96,7 @@ always_comb begin
     next_wr           = 1'b0;
     next_address      = address;
     next_done         = 1'b0;
+    next_shift_reg = shift_reg;
 
     case (cs)
         IDLE: begin
@@ -115,6 +117,8 @@ always_comb begin
         end
 
         READ: begin
+            next_shift_reg = {shift_reg[6:0], miso_registered};
+
             if (bit_counter == 0) begin
                 next_wr = 1'b1;
                 next_bit_counter = 3'd7;
