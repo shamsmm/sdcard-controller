@@ -53,7 +53,6 @@ always_ff @(posedge clk or negedge rst_n) begin
         done    <= 1'b0;
         wr    <= 1'b0;
         sclk_en <= 1'b0;
-        shift_reg <= 0;
     end else begin
         cs           <= ns;
 

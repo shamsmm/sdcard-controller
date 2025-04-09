@@ -116,22 +116,18 @@ module top (
         end
     end
 
-    logic [4:0] counter;
+    logic [6:0] counter;
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             counter <= 0;
             sd_start <= 0;
-        end else begin 
-            if (!sd_done) begin
-                counter <= counter + 1;
+        end else begin             
+            counter <= counter + 1;
 
-                case(counter)
-                    'd10: sd_start <= 1;
-                    'd15: sd_start <= 0;
-                endcase
-            end else begin
-                counter <= 0;
-            end
+            case(counter)
+                'd10: sd_start <= 1;
+                'd15: sd_start <= 0;
+            endcase
         end
     end
 

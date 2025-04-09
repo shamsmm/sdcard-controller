@@ -52,6 +52,7 @@ always_ff @(posedge clk or negedge rst_n) begin
         spi_start <= 0;
         spi_ss <= 1;
         done <= 0;
+        response <= 0;
     end else begin
         cs           <= ns;
         wait_rs           <= next_wait_rs;
