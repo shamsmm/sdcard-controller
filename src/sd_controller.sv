@@ -29,10 +29,11 @@ typedef enum logic [2:0] {
     SPISTART = 3'd1,
     WAITWRITE = 3'd2,
     SPIREAD = 3'd3,
-    WAITREAD = 3'd4
+    WAITREAD = 3'd4,
+    WAIT1 = 3'd5
 } state_t;
 
-state_t cs, ns, rs, next_rs;
+state_t cs, ns, wait_rs, next_wait_rs, transfer_rs, next_transfer_rs;
 
 logic next_spi_op, next_spi_start, next_spi_ss, next_done;
 logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] next_spi_size;
@@ -44,7 +45,8 @@ assign spi_data_in = command_buffer[spi_address];
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         cs           <= IDLE;
-        rs          <= IDLE;
+        wait_rs           <= IDLE;
+        transfer_rs           <= IDLE;
         spi_size    <= 0;
         spi_op <= 0;
         spi_start <= 0;
@@ -52,7 +54,8 @@ always_ff @(posedge clk or negedge rst_n) begin
         done <= 0;
     end else begin
         cs           <= ns;
-        rs           <= next_rs;
+        wait_rs           <= next_wait_rs;
+        transfer_rs           <= next_transfer_rs;
         spi_size    <= next_spi_size;
         spi_op <= next_spi_op;
         spi_start <= next_spi_start;
@@ -64,7 +67,8 @@ end
 
 always_comb begin
     ns = cs;
-    next_rs = rs;
+    next_wait_rs = wait_rs;
+    next_transfer_rs = transfer_rs;
     next_spi_size = spi_size;
     next_spi_op = spi_op;
     next_spi_start = spi_start;
@@ -88,13 +92,18 @@ always_comb begin
                 next_spi_op = 1;
                 next_spi_ss = 0;
                 ns = SPISTART;
-                next_rs = WAITWRITE;
+                next_transfer_rs = WAITWRITE;
             end
         end
 
         SPISTART: begin
             next_spi_start = 1'b1;
-            ns = rs;
+            ns = WAIT1;
+            next_wait_rs = transfer_rs;
+        end
+
+        WAIT1: begin
+            ns = wait_rs;
         end
 
         WAITWRITE: begin
@@ -109,7 +118,7 @@ always_comb begin
             next_spi_size = nresponse;
             next_spi_op = 0;
             ns = SPISTART;
-            next_rs = WAITREAD;
+            next_transfer_rs = WAITREAD;
         end
 
         WAITREAD: begin

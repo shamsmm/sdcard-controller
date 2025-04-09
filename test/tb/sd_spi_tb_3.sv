@@ -1,38 +1,14 @@
-module top (
-    input logic hclk,
-    input logic rst_n,
-    output logic mosi,
-    input logic miso,
-    output logic sclk,
-    output logic ss,
-    output logic [5:0] led
-);
-    // Clock driver to bring 27MHz to 100KHz-400KHz
-    logic clk8, clk64;
+/* verilator lint_off WIDTHTRUNC */
 
-    Gowin_CLKDIV8 div1 (
-        .clkout(clk8), //output clkout
-        .hclkin(hclk), //input hclkin
-        .resetn(rst_n) //input resetn
-    );
+module sd_spi_tb_3;
 
-    Gowin_CLKDIV8 div2 (
-        .clkout(clk64), //output clkout
-        .hclkin(clk8), //input hclkin
-        .resetn(rst_n) //input resetn
-    );
-
-    Gowin_CLKDIV4 div3 (
-        .clkout(clk), //output clkout
-        .hclkin(clk64), //input hclkin
-        .resetn(rst_n) //input resetn
-    );
-
-    localparam int MEM_SIZE = 16;
-
-    logic sd_start;
+    // Parameters
+    localparam int MEM_SIZE = 10;
+    localparam int CLK_PERIOD = 2;
 
     // SPI signals
+    logic mosi, miso, sclk;
+    logic clk, rst_n;
     logic [7:0] data_in;
     logic [7:0] data_out;
     logic wr;
@@ -52,6 +28,18 @@ module top (
     logic spi_ss;
     logic spi_done;
     logic sd_done;
+
+    // Memories
+    logic [7:0] mem_ro [MEM_SIZE];
+    logic [7:0] mem_wo [MEM_SIZE];
+
+    // Connect memory interface
+    //    assign data_in = mem_ro[address];
+
+    always_ff @(posedge clk) begin
+        if (wr)
+            mem_wo[address] <= data_out;
+    end
 
     // Instantiate SPI controller
     spi_controller #(
@@ -79,7 +67,6 @@ module top (
     assign spi_data_out = data_out;
     assign spi_done = done;
     assign data_in = spi_data_in;
-    assign ss = spi_ss;
 
     // Instantiate SD Controller
     sd_controller #(
@@ -96,24 +83,43 @@ module top (
         .done(sd_done),
         .cmd(6'h0),
         .arg(32'h0),
-        .crc(7'h44),
+        .crc(7'h4A),
         .nresponse(0),
         .start(sd_start),
         .clk(clk),
         .rst_n(rst_n)
     );
 
-    logic [7:0] mem [MEM_SIZE];
-    always_ff @(posedge clk, negedge rst_n) begin
-        if (!rst_n) begin
-            mem <= '{MEM_SIZE {'b0}};
-            led <= 255;
-        end else begin
-            if (wr) begin
-                mem[address] <= data_out;
-                led <= ~data_out; // leds are active low
-            end
-        end
+    logic sd_start;
+
+    // Simple SPI slave model to echo back data (for test purposes)
+    sd_card_dummy sd_card (
+        .mosi(mosi),
+        .miso(miso),
+        .sclk(sclk),
+        .clk(clk),
+        .rst_n(rst_n)
+    );
+
+    // Clock generation
+    always #(CLK_PERIOD / 2) clk = ~clk;
+
+    // Test sequence
+    initial begin
+        $dumpfile("test.fst");
+        $dumpvars(0, sd_spi_tb);
+
+        clk = 0;
+        rst_n = 0;
+        spi_start = 0;
+        sd_start = 0;
+
+
+        #10 rst_n = 1;
+
+
+        #1000;
+        $finish;
     end
 
     logic [4:0] counter;
@@ -121,7 +127,7 @@ module top (
         if (!rst_n) begin
             counter <= 0;
             sd_start <= 0;
-        end else begin 
+        end else begin
             if (!sd_done) begin
                 counter <= counter + 1;
 
