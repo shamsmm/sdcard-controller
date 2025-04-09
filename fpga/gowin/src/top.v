@@ -28,7 +28,7 @@ module top (
         .resetn(rst_n) //input resetn
     );
 
-    localparam int MEM_SIZE = 16;
+    localparam int MEM_SIZE = 30;
 
     logic sd_start;
 
@@ -53,6 +53,14 @@ module top (
     logic spi_done;
     logic sd_done;
 
+    typedef enum logic [0:0] {
+        TOP  = 1'd0,
+        SD = 1'd1
+    } spi_arbiter_t;
+
+
+    spi_arbiter_t spi_arbiter;
+
     // Instantiate SPI controller
     spi_controller #(
         .MEMORY_SIZE_IN_BYTES(MEM_SIZE)
@@ -73,13 +81,29 @@ module top (
     );
 
     // Connect SPI controller interface
-    assign op     = spi_op;
-    assign start  = spi_start;
-    assign size   = spi_size;
+    
     assign spi_data_out = data_out;
     assign spi_done = done;
-    assign data_in = spi_data_in;
-    assign ss = spi_ss;
+
+    always_comb begin
+        case (spi_arbiter)
+            SD: begin
+                op     = spi_op;
+                start  = spi_start;
+                size   = spi_size;
+                data_in = spi_data_in;
+                ss = spi_ss;
+            end
+            
+            TOP: begin
+                op     = top_op;
+                start  = top_start;
+                size   = top_size;
+                data_in = top_data_in;
+                ss = top_ss;
+            end
+        endcase
+    end
 
     // Instantiate SD Controller
     sd_controller #(
@@ -117,16 +141,39 @@ module top (
     end
 
     logic [6:0] counter;
+    logic top_op, top_start, top_size, top_data_in, top_ss; 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             counter <= 0;
             sd_start <= 0;
+            spi_arbiter <= TOP;
+            top_op <= 0;
+            top_start <= 0;
+            top_size <= 0;
+            top_data_in <= 0;
+            top_ss <= 1;
         end else begin             
-            counter <= counter + 1;
+            if (    counter != 8 && counter != 23
+                || (counter == 8 && spi_done)
+                || (counter == 23 && sd_done)
+            )
+                counter <= counter + 1;
 
             case(counter)
-                'd10: sd_start <= 1;
-                'd15: sd_start <= 0;
+                5: begin
+                    top_op <= 1;
+                    top_ss <= 1;
+                    top_size <= 15;
+                    top_data_in <= 255;
+                end
+                6: top_start <= 1;
+                7: top_start <= 0;
+                8: ;
+                20: spi_arbiter <= SD;
+                21: sd_start <= 1;
+                22: sd_start <= 0;
+                23: ;
+                // leave to overflow and start again
             endcase
         end
     end
