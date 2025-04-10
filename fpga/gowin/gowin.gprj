@@ -1,0 +1,16 @@
+<?xml version="1" encoding="UTF-8"?>
+<!DOCTYPE gowin-fpga-project>
+<Project>
+    <Template>FPGA</Template>
+    <Version>5</Version>
+    <Device name="GW1NR-9C" pn="GW1NR-LV9QN88PC6/I5">gw1nr9c-004</Device>
+    <FileList>
+        <File path="src/gowin_clkdiv/gowin_clkdiv4.v" type="file.verilog" enable="1"/>
+        <File path="src/gowin_clkdiv/gowin_clkdiv8.v" type="file.verilog" enable="1"/>
+        <File path="src/sd_controller.sv" type="file.verilog" enable="1"/>
+        <File path="src/spi_controller.sv" type="file.verilog" enable="1"/>
+        <File path="src/top.v" type="file.verilog" enable="1"/>
+        <File path="src/fpga_spi.cst" type="file.cst" enable="1"/>
+        <File path="src/gowin.rao" type="file.gao" enable="1"/>
+    </FileList>
+</Project>

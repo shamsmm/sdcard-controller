@@ -68,6 +68,8 @@ module sd_spi_tb_2;
     assign spi_done = done;
     assign data_in = spi_data_in;
 
+    logic [7:0] R1;
+
     // Instantiate SD Controller
     sd_controller #(
         .MEMORY_SIZE_IN_BYTES(MEM_SIZE)
@@ -87,7 +89,8 @@ module sd_spi_tb_2;
         .nresponse(0),
         .start(sd_start),
         .clk(clk),
-        .rst_n(rst_n)
+        .rst_n(rst_n),
+        .R1(R1)
     );
 
     logic sd_start;

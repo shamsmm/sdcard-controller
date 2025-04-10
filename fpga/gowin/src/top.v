@@ -105,6 +105,8 @@ module top (
         endcase
     end
 
+
+    logic [7:0] R1;
     // Instantiate SD Controller
     sd_controller #(
         .MEMORY_SIZE_IN_BYTES(MEM_SIZE)
@@ -120,11 +122,12 @@ module top (
         .done(sd_done),
         .cmd(6'h0),
         .arg(32'h0),
-        .crc(7'h44),
+        .crc(7'h4A),
         .nresponse(0),
         .start(sd_start),
         .clk(clk),
-        .rst_n(rst_n)
+        .rst_n(rst_n),
+        .R1(R1)
     );
 
     logic [7:0] mem [MEM_SIZE];
@@ -135,13 +138,18 @@ module top (
         end else begin
             if (wr) begin
                 mem[address] <= data_out;
-                led <= ~data_out; // leds are active low
             end
+
+            if (sd_done)
+                led <= ~R1; // leds are active low
         end
     end
 
-    logic [6:0] counter;
-    logic top_op, top_start, top_size, top_data_in, top_ss; 
+    logic [7:0] counter;
+    logic top_op, top_start, top_ss;
+    logic [$clog2(MEM_SIZE)-1:0] top_size;
+    logic [7:0] top_data_in;
+ 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             counter <= 0;
@@ -153,27 +161,23 @@ module top (
             top_data_in <= 0;
             top_ss <= 1;
         end else begin             
-            if (    counter != 8 && counter != 23
-                || (counter == 8 && spi_done)
-                || (counter == 23 && sd_done)
-            )
+            if (counter != 8 && counter != 15)
                 counter <= counter + 1;
 
             case(counter)
                 5: begin
                     top_op <= 1;
                     top_ss <= 1;
-                    top_size <= 15;
+                    top_size <= 16 - 1;
                     top_data_in <= 255;
                 end
                 6: top_start <= 1;
                 7: top_start <= 0;
-                8: ;
-                20: spi_arbiter <= SD;
-                21: sd_start <= 1;
-                22: sd_start <= 0;
-                23: ;
-                // leave to overflow and start again
+                8: if (spi_done) counter <= counter + 1;
+                9: spi_arbiter <= SD;
+                10: sd_start <= 1;
+                11: sd_start <= 0;
+                15: ;
             endcase
         end
     end

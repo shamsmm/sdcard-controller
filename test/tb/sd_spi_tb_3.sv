@@ -2,13 +2,34 @@
 
 module sd_spi_tb_3;
 
-    // Parameters
-    localparam int MEM_SIZE = 10;
-    localparam int CLK_PERIOD = 2;
+    // Clock generation
+    logic clk, rst_n, led, mosi, miso, sclk, ss;
+    always #1 clk = ~clk;
+
+    // Test sequence
+    initial begin
+        $dumpfile("test.fst");
+        $dumpvars(0, sd_spi_tb);
+
+        clk = 0;
+        rst_n = 0;
+        spi_start = 0;
+        sd_start = 0;
+
+
+        #10 rst_n = 1;
+
+
+        #1000;
+        $finish;
+    end
+
+    //////////////////////////// FPGA
+    localparam int MEM_SIZE = 30;
+
+    logic sd_start;
 
     // SPI signals
-    logic mosi, miso, sclk;
-    logic clk, rst_n;
     logic [7:0] data_in;
     logic [7:0] data_out;
     logic wr;
@@ -29,17 +50,13 @@ module sd_spi_tb_3;
     logic spi_done;
     logic sd_done;
 
-    // Memories
-    logic [7:0] mem_ro [MEM_SIZE];
-    logic [7:0] mem_wo [MEM_SIZE];
+    typedef enum logic [0:0] {
+        TOP  = 1'd0,
+        SD = 1'd1
+    } spi_arbiter_t;
 
-    // Connect memory interface
-    //    assign data_in = mem_ro[address];
 
-    always_ff @(posedge clk) begin
-        if (wr)
-            mem_wo[address] <= data_out;
-    end
+    spi_arbiter_t spi_arbiter;
 
     // Instantiate SPI controller
     spi_controller #(
@@ -61,12 +78,29 @@ module sd_spi_tb_3;
     );
 
     // Connect SPI controller interface
-    assign op     = spi_op;
-    assign start  = spi_start;
-    assign size   = spi_size;
+    
     assign spi_data_out = data_out;
     assign spi_done = done;
-    assign data_in = spi_data_in;
+
+    always_comb begin
+        case (spi_arbiter)
+            SD: begin
+                op     = spi_op;
+                start  = spi_start;
+                size   = spi_size;
+                data_in = spi_data_in;
+                ss = spi_ss;
+            end
+            
+            TOP: begin
+                op     = top_op;
+                start  = top_start;
+                size   = top_size;
+                data_in = top_data_in;
+                ss = top_ss;
+            end
+        endcase
+    end
 
     // Instantiate SD Controller
     sd_controller #(
@@ -90,55 +124,53 @@ module sd_spi_tb_3;
         .rst_n(rst_n)
     );
 
-    logic sd_start;
-
-    // Simple SPI slave model to echo back data (for test purposes)
-    sd_card_dummy sd_card (
-        .mosi(mosi),
-        .miso(miso),
-        .sclk(sclk),
-        .clk(clk),
-        .rst_n(rst_n)
-    );
-
-    // Clock generation
-    always #(CLK_PERIOD / 2) clk = ~clk;
-
-    // Test sequence
-    initial begin
-        $dumpfile("test.fst");
-        $dumpvars(0, sd_spi_tb);
-
-        clk = 0;
-        rst_n = 0;
-        spi_start = 0;
-        sd_start = 0;
-
-
-        #10 rst_n = 1;
-
-
-        #1000;
-        $finish;
-    end
-
-    logic [4:0] counter;
-    always @(posedge clk or negedge rst_n) begin
+    logic [7:0] mem [MEM_SIZE];
+    always_ff @(posedge clk, negedge rst_n) begin
         if (!rst_n) begin
-            counter <= 0;
-            sd_start <= 0;
+            mem <= '{MEM_SIZE {'b0}};
+            led <= 255;
         end else begin
-            if (!sd_done) begin
-                counter <= counter + 1;
-
-                case(counter)
-                    'd10: sd_start <= 1;
-                    'd15: sd_start <= 0;
-                endcase
-            end else begin
-                counter <= 0;
+            if (wr) begin
+                mem[address] <= data_out;
+                led <= ~data_out; // leds are active low
             end
         end
     end
 
+    logic [7:0] counter;
+    logic top_op, top_start, top_ss;
+    logic [$clog2(MEM_SIZE)-1:0] top_size;
+    logic [7:0] top_data_in;
+ 
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            counter <= 0;
+            sd_start <= 0;
+            spi_arbiter <= TOP;
+            top_op <= 0;
+            top_start <= 0;
+            top_size <= 0;
+            top_data_in <= 0;
+            top_ss <= 1;
+        end else begin             
+            if (counter != 8 && counter != 15)
+                counter <= counter + 1;
+
+            case(counter)
+                5: begin
+                    top_op <= 1;
+                    top_ss <= 1;
+                    top_size <= 16 - 1;
+                    top_data_in <= 255;
+                end
+                6: top_start <= 1;
+                7: top_start <= 0;
+                8: if (spi_done) counter <= counter + 1;
+                12: spi_arbiter <= SD;
+                14: sd_start <= 1;
+                15: ;
+            endcase
+        end
+    end
+    
 endmodule

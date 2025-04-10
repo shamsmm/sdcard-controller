@@ -52,7 +52,7 @@ always_comb begin
     start = 1;
     size = 0;
     op = 1;
-    data_in = {cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]} == 'h400000000095 ? 8'h01 : 8'hFF;
+    data_in = 8'hFF;
 end
 
 endmodule

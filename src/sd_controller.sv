@@ -15,6 +15,7 @@ module sd_controller #(
     input logic [7:1]   crc,
     input logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] nresponse,
     input start,
+    output logic [7:0] R1,
     input clk,
     input rst_n
 );
@@ -37,10 +38,11 @@ state_t cs, ns, wait_rs, next_wait_rs, transfer_rs, next_transfer_rs;
 
 logic next_spi_op, next_spi_start, next_spi_ss, next_done;
 logic [$clog2(MEMORY_SIZE_IN_BYTES)-1:0] next_spi_size;
-
-logic [7:0] response, next_response;
+logic [7:0] next_R1;
 
 assign spi_data_in = command_buffer[spi_address];
+
+logic [$clog2(8) - 1:0] counter, next_counter;
 
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -52,7 +54,8 @@ always_ff @(posedge clk or negedge rst_n) begin
         spi_start <= 0;
         spi_ss <= 1;
         done <= 0;
-        response <= 0;
+        R1 <= 255;
+        counter <= 0;
     end else begin
         cs           <= ns;
         wait_rs           <= next_wait_rs;
@@ -62,7 +65,8 @@ always_ff @(posedge clk or negedge rst_n) begin
         spi_start <= next_spi_start;
         spi_ss <= next_spi_ss;
         done         <= next_done;
-        response <= next_response;
+        R1 <= next_R1;
+        counter <= next_counter;
     end
 end
 
@@ -75,7 +79,8 @@ always_comb begin
     next_spi_start = spi_start;
     next_spi_ss = spi_ss;
     next_done = 0;
-    next_response = response;
+    next_R1 = R1;
+    next_counter = counter;
 
     command_buffer[0] = {2'b01, cmd};
     command_buffer[1] = arg[39:32];
@@ -94,6 +99,7 @@ always_comb begin
                 next_spi_ss = 0;
                 ns = SPISTART;
                 next_transfer_rs = WAITWRITE;
+                next_counter = 0;
             end
         end
 
@@ -111,7 +117,6 @@ always_comb begin
             next_spi_start = 0;
             if (spi_done) begin
                 ns = SPIREAD;
-                next_response = spi_data_out;
             end
         end
 
@@ -124,9 +129,17 @@ always_comb begin
 
         WAITREAD: begin
             next_spi_start = 0;
+
             if (spi_done) begin
-                ns = IDLE;
-                next_done = 1'b1;
+                next_counter = counter + 1;
+                next_R1 = spi_data_out;
+
+                if (spi_data_out != 'hFF || counter == 'd7) begin
+                    ns = IDLE;
+                    next_done = 1'b1;
+                end else begin
+                    ns = SPIREAD;
+                end
             end
         end
 
